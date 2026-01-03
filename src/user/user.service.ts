@@ -10,7 +10,7 @@ export class UserService {
   ) {}
 
   async findByWallet(wallet: string) {
-    return this.userModel.findOne({ wallet });
+    return this.userModel.findOne({ wallet:wallet.toLowerCase() });
   }
 
   async register(wallet: string, name: string, referrer: string) {
