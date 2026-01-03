@@ -7,16 +7,16 @@ import { User, UserDocument } from '../user/user.schema';
 
 @Injectable()
 export class IcoService {
- constructor(
-  @InjectModel(IcoStage.name)
-  private icoModel: Model<IcoStageDocument>,
+  constructor(
+    @InjectModel(IcoStage.name)
+    private icoModel: Model<IcoStageDocument>,
 
-  @InjectModel(Transaction.name)
-  private transactionModel: Model<TransactionDocument>,
+    @InjectModel(Transaction.name)
+    private transactionModel: Model<TransactionDocument>,
 
-  @InjectModel(User.name)
-  private userModel: Model<UserDocument>,
-) {}
+    @InjectModel(User.name)
+    private userModel: Model<UserDocument>,
+  ) { }
 
 
   create(data) {
@@ -38,48 +38,58 @@ export class IcoService {
   }
 
   async completePurchase(data: any) {
-  const { buyer, stageId, txHash, tokens, amount, rewards } = data;
+    const { buyer, phaseId, txHash, tokens, amount, rewards } = data;
+    console.log('Completing purchase for', buyer, phaseId, txHash, tokens, amount, rewards);
+    try { // 1️⃣ Prevent duplicate tx
+      const exists = await this.transactionModel.findOne({ txHash });
+      console.log('Existing transaction check:', exists);
+      // if (exists) {
+      //   return { success: false, message: 'Transaction already recorded' };
+      // }
 
-  // 1️⃣ Prevent duplicate tx
-const exists = await this.transactionModel.findOne({ txHash });
-  if (exists) {
-    return { success: false, message: 'Transaction already recorded' };
+      const totalMlmWei = rewards.reduce(
+        (sum, r) => Number(sum) + Number(r.amount),
+        0n
+      );
+      const buyerNetWei = (tokens) - totalMlmWei;
+      //2️⃣ Store BUY transaction
+      await this.transactionModel.create({
+        wallet: buyer.toLowerCase(),
+        txHash,
+        stageId: phaseId,
+        amount: amount.toString(),
+        tokens: buyerNetWei.toString(),
+        verified: true,
+      });
+
+      //3️⃣ Update ICO sold
+      await this.icoModel.findOneAndUpdate(
+        { stageId: phaseId },
+        { $inc: { sold: Number(tokens) } }
+      );
+
+      //4️⃣ Store MLM rewards
+      for (const r of rewards) {
+        await this.userModel.findOneAndUpdate(
+          { wallet: r.wallet },
+          { $inc: { balance: Number(tokens) } }
+        );
+
+        await this.transactionModel.create({
+          wallet: r.wallet.toLowerCase(),
+          txHash: `${txHash}`,
+          stageId: phaseId,
+          tokens: (r.amount).toString(),
+          amount: '0',
+          verified: true,
+        });
+      }
+
+      return { success: true };
+    }
+    catch (error) {
+      console.error('Error in completePurchase:', error);
+      return { success: false, message: 'Internal server error' };
+    }
   }
-
-  // 2️⃣ Store BUY transaction
-  await this.transactionModel.create({
-    wallet: buyer,
-    txHash,
-    stageId,
-    amount: amount.toString(),
-    tokens: tokens.toString(),
-    verified: true,
-  });
-
-  // 3️⃣ Update ICO sold
-  await this.icoModel.findOneAndUpdate(
-    { _id: stageId },
-    { $inc: { sold: tokens } }
-  );
-
-  // 4️⃣ Update MLM rewards (already calculated on frontend)
-  for (const r of rewards) {
-    await this.userModel.findOneAndUpdate(
-      { wallet: r.wallet },
-      { $inc: { balance: r.amount } }
-    );
-
-    await this.transactionModel.create({
-      wallet: r.wallet,
-      txHash: `${txHash}_${r.wallet}`,
-      stageId,
-      amount: r.amount.toString(),
-      tokens: '0',
-      verified: true,
-    });
-  }
-
-  return { success: true };
-}
-
 }

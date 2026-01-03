@@ -5,14 +5,16 @@ import { ConfigModule } from '@nestjs/config';
 import { UserModule } from './user/user.module';
 import { IcoModule } from './ico/ico.module';
 import { TransactionModule } from './transaction/transaction.module';
+import { StakingModule } from './staking/staking.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    MongooseModule.forRoot("mongodb://localhost:27017/two-pc-ico"),
+    MongooseModule.forRoot("mongodb+srv://sourabhtirthani:sourabhtirthani@cluster0.wpdlmbh.mongodb.net/two-pc-ico"),
     UserModule,
     IcoModule,
     TransactionModule,
+    StakingModule,
   ],
 })
 export class AppModule {}

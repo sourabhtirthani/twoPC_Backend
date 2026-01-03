@@ -5,6 +5,8 @@ export type IcoStageDocument = IcoStage & Document;
 
 @Schema({ timestamps: true })
 export class IcoStage {
+  @Prop()
+  stageId: string;
 
   @Prop()
   title: string;
@@ -27,8 +29,8 @@ export class IcoStage {
   @Prop()
   hardCap: string;
 
-  @Prop({ default: '0' })
-  sold: string;
+  @Prop({ default: 0 })
+  sold: number;
 
   @Prop({ default: true })
   active: boolean;

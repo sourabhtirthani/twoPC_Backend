@@ -1,9 +1,14 @@
-import { Controller, Post, Body } from '@nestjs/common';
+import { Controller, Post, Body,Get, Param, Query } from '@nestjs/common';
 import { UserService } from './user.service';
 
 @Controller('user')
 export class UserController {
   constructor(private readonly userService: UserService) {}
+
+  @Get()
+  async fetchAll() {
+    return await this.userService.fetchAll();
+  }
 
   // 🔐 Wallet login check
   @Post('wallet-login')
@@ -24,5 +29,10 @@ export class UserController {
       body.name,
       body.referrer
     );
+  }
+
+  @Get('referral-tree')
+  async getReferralTree(@Query('wallet') wallet: string) {
+    return this.userService.getReferralTree(wallet.toLowerCase());
   }
 }

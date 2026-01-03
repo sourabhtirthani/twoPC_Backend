@@ -1,0 +1,232 @@
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
+import { InjectModel } from "@nestjs/mongoose";
+import { Model, Types } from "mongoose";
+import { Staking, StakingDocument } from "./staking.schema";
+import { StakingPlan } from "./staking-plan.schema";
+import { Transaction } from "src/transaction/transaction.schema";
+
+@Injectable()
+export class StakingService {
+  constructor(
+    @InjectModel(Staking.name)
+    private readonly stakeModel: Model<StakingDocument>,
+
+    @InjectModel(StakingPlan.name)
+    private readonly planModel: Model<StakingPlan>,
+
+    @InjectModel(Transaction.name)
+    private readonly txModel: Model<Transaction>,
+  ) {}
+
+  /* ===================================================== */
+  /* ================= ADMIN FUNCTIONS =================== */
+  /* ===================================================== */
+
+  async createPlan(data: {
+    title: string;
+    apr: number;
+    lockDays: number;
+    isFixed: boolean;
+    minStake?: number;
+  }) {
+    if (!data.title) {
+      throw new BadRequestException("Plan title is required");
+    }
+
+    if (!data.apr || data.apr <= 0) {
+      throw new BadRequestException("Invalid APR value");
+    }
+
+    if (data.isFixed && (!data.lockDays || data.lockDays <= 0)) {
+      throw new BadRequestException("Lock days required for fixed plan");
+    }
+    const lastPlan = await this.planModel
+    .findOne({})
+    .sort({ planId: -1 })
+    .select({ planId: 1 })
+    .lean();
+
+  // 2. Compute next planId
+  const nextPlanId = lastPlan ? lastPlan.planId + 1 : 1;
+    console.log('Creating plan with ID', nextPlanId);
+    return this.planModel.create({
+      title: data.title,
+      apr: Number(data.apr),
+      lockDays: Number(data.lockDays || 0),
+      isFixed: Boolean(data.isFixed),
+      active: true,
+      minStake: Number(data.minStake || 0),
+      planId: nextPlanId,
+    });
+  }
+
+  async getPlans() {
+    return this.planModel
+      .find({ active: true })
+      .sort({ createdAt: -1 })
+      .lean();
+  }
+
+  /* ===================================================== */
+  /* ================= USER STAKING ====================== */
+  /* ===================================================== */
+
+  async stake(data: {
+    wallet: string;
+    planId: string;       // Mongo _id
+    planIndex: number;    // Contract plan index
+    amount: string;
+    txHash: string;
+  }) {
+    /* ================= VALIDATION ================= */
+
+    if (!data.wallet) {
+      throw new BadRequestException("Wallet address required");
+    }
+    console.log('Staking request from wallet', data.planId);
+    // if (!data.planId || !Number(data.planId)) {
+    //   throw new BadRequestException("Invalid planId");
+    // }
+
+    // if (data.planIndex === undefined || data.planIndex < 0) {
+    //   throw new BadRequestException("Invalid plan index");
+    // }
+
+    if (!data.amount || Number(data.amount) <= 0) {
+      throw new BadRequestException("Invalid staking amount");
+    }
+
+    if (!data.txHash) {
+      throw new BadRequestException("Transaction hash required");
+    }
+
+    const wallet = data.wallet.toLowerCase();
+
+    /* ============ DUPLICATE TX CHECK ============ */
+
+    const existingTx = await this.txModel.findOne({
+      txHash: data.txHash,
+    });
+
+    if (existingTx) {
+      throw new BadRequestException("Transaction already recorded");
+    }
+
+    /* ============ PLAN VALIDATION ============ */
+
+    const plan = await this.planModel.findOne({ planId: Number(data.planId) });
+
+    if (!plan) {
+      throw new NotFoundException("Staking plan not found");
+    }
+
+    if (!plan.active) {
+      throw new BadRequestException("Staking plan is inactive");
+    }
+
+    /* ================= DB INSERT ================= */
+
+    await this.stakeModel.create({
+      wallet,
+      planIndex: Number(data.planId),
+      amount: data.amount,
+      txHash: data.txHash,
+    });
+
+    await this.txModel.create({
+      wallet,
+      txHash: data.txHash,
+      amount: data.amount,
+      tokens: data.amount,
+      verified: true,
+    });
+
+    /* ================= RESPONSE ================= */
+
+    return {
+      success: true,
+      message: "Stake recorded successfully",
+    };
+  }
+
+  /* ===================================================== */
+  /* ================= USER DATA ========================= */
+  /* ===================================================== */
+
+  async getUserStakes(wallet: string) {
+    if (!wallet) {
+      throw new BadRequestException("Wallet required");
+    }
+
+    return this.stakeModel
+      .find({ wallet: wallet.toLowerCase() })
+      .sort({ createdAt: -1 })
+      .lean();
+  }
+
+    async getUserStakeAndRewards(wallet: string) {
+    const result = await this.stakeModel.aggregate([
+      {
+        $match: { wallet: wallet.toLowerCase() },
+      },
+
+      // Convert amount string → number
+      {
+        $addFields: {
+          amountNumber: { $toDouble: '$amount' },
+        },
+      },
+
+      // Group by plan
+      {
+        $group: {
+          _id: '$planIndex',
+          totalStakePerPlan: { $sum: '$amountNumber' },
+        },
+      },
+
+      // Join staking plans
+      {
+        $lookup: {
+          from: 'stakingplans',
+          localField: '_id',
+          foreignField: 'planId',
+          as: 'plan',
+        },
+      },
+      { $unwind: '$plan' },
+
+      // Calculate reward per plan
+      {
+        $addFields: {
+          rewardPerPlan: {
+            $multiply: [
+              '$totalStakePerPlan',
+              { $divide: ['$plan.apr', 100] },
+              { $divide: ['$plan.lockDays', 365] },
+            ],
+          },
+        },
+      },
+
+      // Final aggregation
+      {
+        $group: {
+          _id: null,
+          totalStaked: { $sum: '$totalStakePerPlan' },
+          totalRewards: { $sum: '$rewardPerPlan' },
+        },
+      },
+    ]);
+
+    return {
+      wallet,
+      totalStaked: result[0]?.totalStaked || 0,
+      totalRewards: result[0]?.totalRewards || 0,
+    };
+  }
+}
