@@ -16,8 +16,14 @@ export class Staking {
   @Prop({ required: true })
   amount: string; // stored as string for precision
 
+  @Prop({ enum: ['ACTIVE', 'CLAIMED', 'EMERGENCY'], default: 'ACTIVE' })
+  status: 'ACTIVE' | 'CLAIMED' | 'EMERGENCY';
+
   @Prop({ required: true, unique: true })
   txHash: string;
+
+  @Prop({ default: null })
+  withdrawTxHash?: string;
 }
 
 export const StakingSchema = SchemaFactory.createForClass(Staking);

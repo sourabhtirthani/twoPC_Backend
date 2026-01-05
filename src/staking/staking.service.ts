@@ -135,6 +135,7 @@ export class StakingService {
       planIndex: Number(data.planId),
       amount: data.amount,
       txHash: data.txHash,
+      status: 'ACTIVE',
     });
 
     await this.txModel.create({
@@ -157,21 +158,11 @@ export class StakingService {
   /* ================= USER DATA ========================= */
   /* ===================================================== */
 
-  async getUserStakes(wallet: string) {
-    if (!wallet) {
-      throw new BadRequestException("Wallet required");
-    }
-
-    return this.stakeModel
-      .find({ wallet: wallet.toLowerCase() })
-      .sort({ createdAt: -1 })
-      .lean();
-  }
 
     async getUserStakeAndRewards(wallet: string) {
     const result = await this.stakeModel.aggregate([
       {
-        $match: { wallet: wallet.toLowerCase() },
+        $match: { wallet: wallet.toLowerCase(), status: 'ACTIVE' },
       },
 
       // Convert amount string → number
@@ -228,5 +219,94 @@ export class StakingService {
       totalStaked: result[0]?.totalStaked || 0,
       totalRewards: result[0]?.totalRewards || 0,
     };
+  }
+
+  async getUserStakes(wallet: string) {
+    return this.stakeModel.aggregate([
+      {
+        $match: {
+          wallet: wallet.toLowerCase(),
+          status: "ACTIVE",
+        },
+      },
+
+      // Join staking plans
+      {
+        $lookup: {
+          from: "stakingplans",          // Mongo collection name
+          localField: "planIndex",
+          foreignField: "planId",
+          as: "plan",
+        },
+      },
+
+      { $unwind: "$plan" },
+
+      // Compute unlock date
+      {
+        $addFields: {
+          unlockAt: {
+            $dateAdd: {
+              startDate: "$createdAt",
+              unit: "day",
+              amount: "$plan.lockDays",
+            },
+          },
+        },
+      },
+
+      // Shape response exactly for frontend
+      {
+        $project: {
+          _id: 1,
+          stakeIndex: "$planIndex",
+          amount: 1,
+          planTitle: "$plan.title",
+          apr: "$plan.apr",
+          unlockAt: 1,
+          status: 1,
+          txHash: 1,
+          withdrawTxHash: 1,
+          createdAt: 1,
+        },
+      },
+
+      { $sort: { createdAt: -1 } },
+    ]);
+  }
+    async withdraw(wallet: string, stakeIndex: number, txHash: string) {
+    const stake = await this.stakeModel.findOne({
+      wallet: wallet.toLowerCase(),
+      planIndex: stakeIndex,
+      status: 'ACTIVE',
+    });
+
+    if (!stake) {
+      throw new BadRequestException("Stake not found or already withdrawn");
+    }
+
+    stake.status = 'CLAIMED';
+    stake.withdrawTxHash = txHash;
+    await stake.save();
+
+    return { success: true };
+  }
+
+  async emergencyWithdraw(wallet: string, stakeIndex: number, txHash: string) {
+    const stake = await this.stakeModel.findOne({
+      wallet: wallet.toLowerCase(),
+      planIndex: stakeIndex,
+      status: 'ACTIVE',
+    });
+
+    if (!stake) {
+      throw new BadRequestException("Stake not found or already withdrawn");
+    }
+
+    stake.status = 'EMERGENCY';
+    stake.withdrawTxHash = txHash;
+    await stake.save();
+
+    return { success: true };
   }
 }

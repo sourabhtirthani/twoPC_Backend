@@ -31,4 +31,21 @@ export class StakingController {
   getUser(@Body('wallet') wallet: string) {
     return this.staking.getUserStakes(wallet.toLowerCase());
   }
+
+  @Get("user-stakes")
+  async getUserStakes(@Query("wallet") wallet: string) {
+    return this.staking.getUserStakes(wallet);
+  }
+
+  @Post("withdraw")
+  withdraw(@Body() body: any) {
+    const { wallet, stakeIndex, txHash } = body;
+    return this.staking.withdraw(wallet, stakeIndex, txHash);
+  }
+
+  @Post("emergency-withdraw")
+  emergencyWithdraw(@Body() body: any) {
+    const { wallet, stakeIndex, txHash } = body;
+    return this.staking.emergencyWithdraw(wallet, stakeIndex, txHash);
+  }
 }
