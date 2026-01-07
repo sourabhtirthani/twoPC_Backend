@@ -7,6 +7,8 @@ import { IcoModule } from './ico/ico.module';
 import { TransactionModule } from './transaction/transaction.module';
 import { StakingModule } from './staking/staking.module';
 import * as dotenv from 'dotenv';
+import { TokenModule } from './token/token.module';
+import { AdminModule } from './admin/admin.module';
 dotenv.config();
 @Module({
   imports: [
@@ -16,6 +18,8 @@ dotenv.config();
     IcoModule,
     TransactionModule,
     StakingModule,
+    TokenModule,
+    AdminModule,
   ],
 })
 export class AppModule {}
