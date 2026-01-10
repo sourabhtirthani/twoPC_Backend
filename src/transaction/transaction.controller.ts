@@ -15,4 +15,10 @@ export class TransactionController {
   getByWallet(@Query('wallet') wallet: string) {
     return this.txService.getByWallet(wallet);
   }
+
+   @Get("transactions")
+    getRefferalIncome(@Query("wallet") wallet: string) {
+      console.log("Fetching incoming summary for wallet:", wallet);
+      return this.txService.getIncomingSummary(wallet);
+    }
 }

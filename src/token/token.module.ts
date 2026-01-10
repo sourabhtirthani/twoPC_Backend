@@ -6,11 +6,16 @@ import {
   TokenTransaction,
   TokenTransactionSchema,
 } from "./token-transaction.schema";
-
+import {
+  User,
+  UserSchema,
+} from "src/user/user.schema";
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: TokenTransaction.name, schema: TokenTransactionSchema },
+      { name: User.name, schema: UserSchema },
+      
     ]),
   ],
   controllers: [TokenController],

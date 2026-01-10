@@ -56,6 +56,7 @@ export class IcoService {
       await this.transactionModel.create({
         wallet: buyer.toLowerCase(),
         txHash,
+        from: buyer.toLowerCase(),
         stageId: phaseId,
         amount: amount.toString(),
         tokens: buyerNetWei.toString(),
@@ -78,6 +79,7 @@ export class IcoService {
         await this.transactionModel.create({
           wallet: r.wallet.toLowerCase(),
           txHash: `${txHash}`,
+          from: buyer.toLowerCase(),  
           stageId: phaseId,
           tokens: (r.amount).toString(),
           amount: '0',

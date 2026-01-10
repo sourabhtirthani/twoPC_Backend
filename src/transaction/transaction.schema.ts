@@ -9,6 +9,9 @@ export class Transaction {
   @Prop()
   wallet: string;
 
+   @Prop()
+  from: string;
+
   @Prop()
   txHash: string;
 
@@ -23,6 +26,9 @@ export class Transaction {
 
   @Prop({ default: true })
   verified: boolean;
+
+  @Prop({ required: true })
+  timestamp: Date;
 }
 
 export const TransactionSchema =
