@@ -13,7 +13,7 @@ export class UserController {
   // 🔐 Wallet login check
   @Post('wallet-login')
   async walletLogin(@Body() body) {
-    const user = await this.userService.findByWallet(body.wallet);
+    const user = await this.userService.findByWallet((body.wallet).toLowerCase());
     console.log('wallet login check:', body.wallet, user);
     if (!user) {
       return { exists: false };
@@ -25,7 +25,7 @@ export class UserController {
   @Post('register')
   async register(@Body() body) {
     return this.userService.register(
-      body.wallet,
+      body.wallet.toLowerCase(),
       body.name,
       body.referrer
     );

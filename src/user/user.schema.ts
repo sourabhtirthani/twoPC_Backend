@@ -20,6 +20,9 @@ export class User {
 
   @Prop({ default: 0 })
   balance: number; 
+
+  @Prop({ default: 0 })
+  referralIncome: number; 
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
