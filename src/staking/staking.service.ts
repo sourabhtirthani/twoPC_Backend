@@ -32,6 +32,7 @@ export class StakingService {
     lockDays: number;
     isFixed: boolean;
     minStake?: number;
+    maxStake?: number; 
   }) {
     if (!data.title) {
       throw new BadRequestException("Plan title is required");
@@ -60,6 +61,7 @@ export class StakingService {
       isFixed: Boolean(data.isFixed),
       active: true,
       minStake: Number(data.minStake || 0),
+      maxStake: Number(data.maxStake || 0),
       planId: nextPlanId,
     });
   }

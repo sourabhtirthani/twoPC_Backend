@@ -21,6 +21,9 @@ export class StakingPlan {
    @Prop({ required: true })
   minStake: number;
 
+   @Prop({ required: true })
+  maxStake: number;
+
   @Prop({ default: false })
   isFixed: boolean;
 
