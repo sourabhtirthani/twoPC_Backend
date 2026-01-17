@@ -27,7 +27,7 @@ export class Transaction {
   @Prop({ default: true })
   verified: boolean;
 
-  @Prop({ required: true })
+  @Prop({ required: false })
   timestamp: Date;
 }
 
