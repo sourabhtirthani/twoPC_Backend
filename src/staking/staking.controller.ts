@@ -16,6 +16,11 @@ export class StakingController {
   getPlans() {
     return this.staking.getPlans();
   }
+
+  @Get('userlist')
+  getUserList() {
+    return this.staking.getUserList();
+  }
   @Get('rewards')
   getUserRewards(@Query('wallet') wallet: string) {
     return this.staking.getUserStakeAndRewards(wallet.toLowerCase());
@@ -47,5 +52,10 @@ export class StakingController {
   emergencyWithdraw(@Body() body: any) {
     const { wallet, stakeIndex, txHash } = body;
     return this.staking.emergencyWithdraw(wallet, stakeIndex, txHash);
+  }
+
+   @Post("TokenSend")
+  tokenSend(@Body() body: any) {
+    return this.staking.tokenSend(body);
   }
 }

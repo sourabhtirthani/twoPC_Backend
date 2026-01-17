@@ -6,6 +6,7 @@ import {
 import { InjectModel } from "@nestjs/mongoose";
 import { Model, Types } from "mongoose";
 import { Staking, StakingDocument } from "./staking.schema";
+import {TokenSendDocument, TokenSend } from "./tokenSend";
 import { StakingPlan } from "./staking-plan.schema";
 import { Transaction } from "src/transaction/transaction.schema";
 
@@ -20,6 +21,9 @@ export class StakingService {
 
     @InjectModel(Transaction.name)
     private readonly txModel: Model<Transaction>,
+
+    @InjectModel(TokenSend.name)
+    private readonly tokenSendModel: Model<TokenSendDocument>,
   ) {}
 
   /* ===================================================== */
@@ -310,5 +314,42 @@ export class StakingService {
     await stake.save();
 
     return { success: true };
+  }
+
+  async tokenSend(data: {
+    title: string;
+    address: string;
+    amount: number;
+    txHash: string;
+  }) {
+    if (!data.title) {
+      throw new BadRequestException("Plan title is required");
+    }
+
+    if (!data.address) {
+      throw new BadRequestException("Address is required");
+    }
+
+    if (!data.amount || data.amount <= 0) {
+      throw new BadRequestException("Invalid amount");
+    }
+    
+   
+
+  // 2. Compute next planId
+ 
+    return this.tokenSendModel.create({
+      title: data.title,
+      address: data.address,
+      amount: data.amount,
+      txHash: data.txHash,
+    });
+  }
+
+  async getUserList() {
+    return this.tokenSendModel
+      .find({})
+      .sort({ createdAt: -1 })
+      .lean();
   }
 }
