@@ -28,6 +28,7 @@ export class TransactionService {
   
    
 async getIncomingSummary(wallet: string) {
+  console.log("Getting incoming summary for wallet:", wallet);
   const address = wallet.toLowerCase();
   console.log("Incoming summary for:", address);
 
@@ -56,9 +57,9 @@ async getIncomingSummary(wallet: string) {
       lastTxAt: Date;
     }
   > = {};
-
+    console.log("Processing transactions for grouping...", txs);
   for (const tx of txs) {
-    const from = tx.from.toLowerCase();
+    const from = tx?.from.toLowerCase();
     const amount = Number(tx.tokens);
 
     if (!map[from]) {

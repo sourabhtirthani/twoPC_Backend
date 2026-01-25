@@ -51,7 +51,8 @@ export class IcoService {
         (sum, r) => Number(sum) + Number(r.amount),
         0n
       );
-      const buyerNetWei = (tokens) - totalMlmWei;
+      const buyerNetWei = Number(tokens) - Number(totalMlmWei);
+      console.log('Calculated buyer net tokens:', buyerNetWei, 'Total MLM tokens:', totalMlmWei);
       //2️⃣ Store BUY transaction
       await this.transactionModel.create({
         wallet: buyer.toLowerCase(),
@@ -63,19 +64,26 @@ export class IcoService {
         verified: true,
       });
 
-      //3️⃣ Update ICO sold
+      // //3️⃣ Update ICO sold
       await this.icoModel.findOneAndUpdate(
         { stageId: phaseId },
         { $inc: { sold: Number(tokens) } }
       );
 
+       await this.userModel.findOneAndUpdate(
+        { wallet: buyer.toLowerCase() },
+        { $inc: { balance: Number(buyerNetWei) } }
+      );
       //4️⃣ Store MLM rewards
       for (const r of rewards) {
         await this.userModel.findOneAndUpdate(
           { wallet: r.wallet },
           { $inc: { balance: Number(tokens) } }
         );
-
+        await this.userModel.findOneAndUpdate(
+          { wallet: r.wallet },
+          { $inc: { referralIncome: Number(tokens) } }
+        );
         await this.transactionModel.create({
           wallet: r.wallet.toLowerCase(),
           txHash: `${txHash}`,

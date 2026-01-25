@@ -10,6 +10,24 @@ export class UserController {
     return await this.userService.fetchAll();
   }
 
+  @Get('referral-tree')
+  async getReferralTree(@Query('wallet') wallet: string) {
+    return this.userService.getReferralTree(wallet.toLowerCase());
+  }
+  
+  @Get('stats')
+  async getWalletStats(@Query('wallet') wallet: string) {
+    console.log('Fetching dashboard stats for wallet:', wallet);
+    return this.userService.getWalletDashboardStats(wallet);
+  }
+
+  @Get(':address')
+  async fetchUser(@Param('address') address: string) {
+    return await this.userService.fetchUser(address.toLowerCase());
+  }
+
+ 
+  
   // 🔐 Wallet login check
   @Post('wallet-login')
   async walletLogin(@Body() body) {
@@ -31,8 +49,5 @@ export class UserController {
     );
   }
 
-  @Get('referral-tree')
-  async getReferralTree(@Query('wallet') wallet: string) {
-    return this.userService.getReferralTree(wallet.toLowerCase());
-  }
+  
 }
