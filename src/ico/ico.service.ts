@@ -37,69 +37,134 @@ export class IcoService {
       .lean();
   }
 
+
   async completePurchase(data: any) {
-    const { buyer, phaseId, txHash, tokens, amount, rewards } = data;
-    console.log('Completing purchase for', buyer, phaseId, txHash, tokens, amount, rewards);
-    try { // 1️⃣ Prevent duplicate tx
-      const exists = await this.transactionModel.findOne({ txHash });
-      console.log('Existing transaction check:', exists);
-      // if (exists) {
-      //   return { success: false, message: 'Transaction already recorded' };
-      // }
+    const MLM_PERCENTAGES = [
+        4,  // Level 1
+        1.5, // Level 2
+        1,   // Level 3
+        0.8, // Level 4
+        0.7, // Level 5
+        0.5, // Level 6
+        0.4, // Level 7
+        0.4, // Level 8
+        0.4, // Level 9
+        0.3, // Level 10
+  ];
 
-      const totalMlmWei = rewards.reduce(
-        (sum, r) => Number(sum) + Number(r.amount),
-        0n
-      );
-      const buyerNetWei = Number(tokens) - Number(totalMlmWei);
-      console.log('Calculated buyer net tokens:', buyerNetWei, 'Total MLM tokens:', totalMlmWei);
-      //2️⃣ Store BUY transaction
-      await this.transactionModel.create({
-        wallet: buyer.toLowerCase(),
-        txHash,
-        from: buyer.toLowerCase(),
-        stageId: phaseId,
-        amount: amount.toString(),
-        tokens: buyerNetWei.toString(),
-        verified: true,
-      });
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+  const { buyer, phaseId, txHash, tokens, amount } = data;
 
-      // //3️⃣ Update ICO sold
-      await this.icoModel.findOneAndUpdate(
-        { stageId: phaseId },
-        { $inc: { sold: Number(tokens) } }
-      );
+  const buyerWallet = buyer.toLowerCase();
+  const totalTokens = Number(tokens);
 
-       await this.userModel.findOneAndUpdate(
-        { wallet: buyer.toLowerCase() },
-        { $inc: { balance: Number(buyerNetWei) } }
-      );
-      //4️⃣ Store MLM rewards
-      for (const r of rewards) {
-        await this.userModel.findOneAndUpdate(
-          { wallet: r.wallet },
-          { $inc: { balance: Number(tokens) } }
-        );
-        await this.userModel.findOneAndUpdate(
-          { wallet: r.wallet },
-          { $inc: { referralIncome: Number(tokens) } }
-        );
-        await this.transactionModel.create({
-          wallet: r.wallet.toLowerCase(),
-          txHash: `${txHash}`,
-          from: buyer.toLowerCase(),  
-          stageId: phaseId,
-          tokens: (r.amount).toString(),
-          amount: '0',
-          verified: true,
-        });
+  try {
+    // 1️⃣ Prevent duplicate tx
+    const exists = await this.transactionModel.findOne({ txHash });
+    // if (exists) {
+    //   return { success: false, message: "Transaction already recorded" };
+    // }
+
+    // 2️⃣ Fetch buyer
+    let currentUser = await this.userModel.findOne({ wallet: buyerWallet });
+    if (!currentUser) {
+      throw new Error("Buyer not found");
+    }
+
+    let distributedTokens = 0;
+    const rewards: {
+      wallet: string;
+      level: number;
+      amount: number;
+    }[] = [];
+
+    // 3️⃣ Traverse upline (max 10 levels)
+    for (let level = 0; level < 10; level++) {
+      const referrerWallet = currentUser.referrer?.toLowerCase();
+      console.log(`Level ${level + 1} referrer:`, referrerWallet);
+      if (!referrerWallet || referrerWallet === ZERO_ADDRESS) {
+        break;
       }
 
-      return { success: true };
+      const percentage = MLM_PERCENTAGES[level];
+      const rewardAmount = (totalTokens * percentage)/100;
+
+      if (rewardAmount > 0) {
+        rewards.push({
+          wallet: referrerWallet,
+          level: level + 1,
+          amount: rewardAmount,
+        });
+
+        distributedTokens += rewardAmount;
+      }
+
+      currentUser = await this.userModel.findOne({
+        wallet: referrerWallet,
+      });
+
+      if (!currentUser) break;
     }
-    catch (error) {
-      console.error('Error in completePurchase:', error);
-      return { success: false, message: 'Internal server error' };
+
+    // 4️⃣ Buyer net tokens
+    const buyerNetTokens = totalTokens - distributedTokens;
+
+    // 5️⃣ Store BUY transaction (buyer)
+    await this.transactionModel.create({
+      wallet: buyerWallet,
+      txHash,
+      from: buyerWallet,
+      stageId: phaseId,
+      amount: amount.toString(),
+      tokens: buyerNetTokens.toString(),
+      verified: true,
+    });
+
+    // 6️⃣ Update buyer balance
+    await this.userModel.findOneAndUpdate(
+      { wallet: buyerWallet },
+      { $inc: { balance: buyerNetTokens } }
+    );
+
+    // 7️⃣ Store MLM rewards
+    for (const r of rewards) {
+      await this.userModel.findOneAndUpdate(
+        { wallet: r.wallet },
+        {
+          $inc: {
+            balance: r.amount,
+            referralIncome: Number(r.amount),
+          },
+        }
+      );
+
+      await this.transactionModel.create({
+        wallet: r.wallet,
+        txHash: `${txHash}`,
+        from: buyerWallet,
+        stageId: phaseId,
+        tokens: r.amount.toString(),
+        amount: "0",
+        verified: true,
+      });
     }
+
+    // 8️⃣ Update ICO sold
+    await this.icoModel.findOneAndUpdate(
+      { stageId: phaseId },
+      { $inc: { sold: totalTokens } }
+    );
+
+    return {
+      success: true,
+      buyerNetTokens,
+      distributedTokens,
+      rewards,
+    };
+  } catch (error) {
+    console.error("Error in completePurchase:", error);
+    return { success: false, message: "Internal server error" };
   }
+}
+
 }

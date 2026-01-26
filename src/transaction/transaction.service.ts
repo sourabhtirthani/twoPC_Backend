@@ -28,93 +28,63 @@ export class TransactionService {
   
    
 async getIncomingSummary(wallet: string) {
-  console.log("Getting incoming summary for wallet:", wallet);
   const address = wallet.toLowerCase();
-  console.log("Incoming summary for:", address);
+  console.log("Fetching incoming transactions for:", address);
 
-  // 1️⃣ Fetch all incoming transactions
+  // 1️⃣ Fetch incoming transactions
   const txs = await this.txModel
-    .find({ wallet: address })
+    .find({
+      wallet: address,
+      from: { $exists: true, $ne: address }, // exclude self + invalid
+    })
+    .sort({ createdAt: -1 })
     .lean();
 
-  console.log("TX COUNT:", txs.length);
-
-  if (txs.length === 0) {
+  if (!txs.length) {
     return {
       wallet: address,
-      totalReceived: "0",
-      contributors: [],
+      transactions: [],
     };
   }
 
-  // 2️⃣ Group manually
-  const map: Record<
-    string,
-    {
-      fromWallet: string;
-      totalAmount: number;
-      txCount: number;
-      lastTxAt: Date;
-    }
-  > = {};
-    console.log("Processing transactions for grouping...", txs);
-  for (const tx of txs) {
-    const from = tx?.from.toLowerCase();
-    const amount = Number(tx.tokens);
+  // 2️⃣ Collect unique sender wallets
+  const senderWallets = Array.from(
+    new Set(
+      txs
+        .map(tx => tx.from?.toLowerCase())
+        .filter(Boolean)
+    )
+  );
 
-    if (!map[from]) {
-      map[from] = {
-        fromWallet: from,
-        totalAmount: 0,
-        txCount: 0,
-        lastTxAt: tx.timestamp,
-      };
-    }
-
-    map[from].totalAmount += isNaN(amount) ? 0 : amount;
-    map[from].txCount += 1;
-
-    if (tx.timestamp > map[from].lastTxAt) {
-      map[from].lastTxAt = tx.timestamp;
-    }
-  }
-
-  // 3️⃣ Fetch users for all senders
-  const wallets = Object.keys(map);
-
+  // 3️⃣ Fetch sender names
   const users = await this.userModel
-    .find({ wallet: { $in: wallets } })
+    .find({ wallet: { $in: senderWallets } })
     .select("wallet name")
     .lean();
 
   const userMap = new Map(
-    users.map((u) => [u.wallet.toLowerCase(), u.name])
+    users.map(u => [u.wallet.toLowerCase(), u.name])
   );
 
-  // 4️⃣ Build final response
-  const contributors = Object.values(map).map((c) => ({
-    fromWallet: c.fromWallet,
-    fromName: userMap.get(c.fromWallet) || "Unknown User",
-    totalAmount: Number(c.totalAmount.toFixed(6)),
-    txCount: c.txCount,
-    lastTxAt: c.lastTxAt,
-  }));
-
-  // 5️⃣ Sort by amount
-  contributors.sort((a, b) => b.totalAmount - a.totalAmount);
-
-  // 6️⃣ Grand total
-  const grandTotal = contributors.reduce(
-    (sum, c) => sum + c.totalAmount,
-    0
-  );
+  // 4️⃣ Build final transaction list
+  const transactions = txs
+    .filter(tx => tx.from) // final safety check
+    .map(tx => ({
+      _id: tx._id,
+      txHash: tx.txHash,
+      fromWallet: tx.from!.toLowerCase(),
+      fromName: userMap.get(tx.from!.toLowerCase()) || "Unknown User",
+      amount: Number(tx.tokens || tx.amount || 0),
+      timestamp: tx.createdAt, // comes from timestamps:true
+    }));
 
   return {
     wallet: address,
-    totalReceived: grandTotal.toFixed(6),
-    contributors,
+    transactions,
   };
 }
+
+
   
 
 }

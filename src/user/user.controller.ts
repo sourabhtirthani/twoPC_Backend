@@ -14,7 +14,7 @@ export class UserController {
   async getReferralTree(@Query('wallet') wallet: string) {
     return this.userService.getReferralTree(wallet.toLowerCase());
   }
-  
+
   @Get('stats')
   async getWalletStats(@Query('wallet') wallet: string) {
     console.log('Fetching dashboard stats for wallet:', wallet);
@@ -26,6 +26,10 @@ export class UserController {
     return await this.userService.fetchUser(address.toLowerCase());
   }
 
+  @Get("referral-summary/:wallet")
+  async referralSummary(@Param("wallet") wallet: string) {
+    return this.userService.getReferralSummary(wallet);
+  }
  
   
   // 🔐 Wallet login check

@@ -131,9 +131,68 @@ export class UserService {
 
     return {
       wallet: address,
-      totalDeposit: totalDeposit.toFixed(4),
+      totalDeposit: user.balance.toFixed(4),
       totalActiveStake: totalActiveStake.toFixed(4),
       totalCommission: Number(user.referralIncome || 0).toFixed(4),
+    };
+  }
+
+  async getReferralSummary(wallet: string) {
+    const rootWallet = wallet.toLowerCase();
+
+    /** 1️⃣ Direct referrals */
+    const directUsers = await this.userModel
+      .find({ referrer: rootWallet })
+      .select("wallet name referralIncome")
+      .lean();
+
+    const directReferrals = directUsers.length;
+
+    /** 2️⃣ Network depth (BFS traversal) */
+    let depth = 0;
+    let currentLevel = directUsers.map(u => u.wallet);
+    const visited = new Set<string>([rootWallet]);
+
+    while (currentLevel.length > 0) {
+      depth++;
+      const nextLevelUsers = await this.userModel
+        .find({ referrer: { $in: currentLevel } })
+        .select("wallet")
+        .lean();
+
+      const nextLevel = nextLevelUsers
+        .map(u => u.wallet)
+        .filter(w => !visited.has(w));
+
+      nextLevel.forEach(w => visited.add(w));
+      currentLevel = nextLevel;
+    }
+
+    const networkDepth = depth === 0 ? 0 : depth;
+
+    /** 3️⃣ Total referral income */
+    const incomeAgg = await this.userModel.aggregate([
+      {
+        $match: {
+          wallet: rootWallet,
+        },
+      },
+      {
+        $project: {
+          referralIncome: 1,
+        },
+      },
+    ]);
+
+    const totalReferralIncome =
+      incomeAgg.length > 0 ? incomeAgg[0].referralIncome : 0;
+
+    return {
+      wallet: rootWallet,
+      directReferrals,
+      networkDepth,
+      totalReferralIncome,
+      directUsers,
     };
   }
 }
