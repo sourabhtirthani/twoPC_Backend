@@ -49,7 +49,7 @@ export class UserController {
     return this.userService.register(
       body.wallet.toLowerCase(),
       body.name,
-      body.referrer
+      body.referrer.toLowerCase()
     );
   }
 

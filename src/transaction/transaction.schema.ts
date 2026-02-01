@@ -32,6 +32,9 @@ export class Transaction {
 
   @Prop({ required: false })
   timestamp: Date;
+
+  @Prop()
+  currency?: string;
 }
 
 export const TransactionSchema =

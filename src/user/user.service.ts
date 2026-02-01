@@ -16,12 +16,34 @@ export class UserService {
   }
 
   async register(wallet: string, name: string, referrer: string) {
-    return this.userModel.create({
-      wallet,
-      name,
-      referrer,
-      role: 'USER'
-    });
+    try{
+      const existing = await this.userModel.findOne({ wallet: wallet.toLowerCase() });
+      if (existing) {
+        console.log('Registration failed: wallet already exists', wallet);
+        throw new Error('Wallet already registered');
+      }
+      const existingReferrer = await this.userModel.findOne({ wallet: referrer.toLowerCase() });
+      if (!existingReferrer) {
+        throw new Error('Referrer wallet not found');
+      }
+      if (wallet.toLowerCase() === referrer.toLowerCase()) {
+        throw new Error('Wallet cannot refer itself');
+      }
+      if (!name || name.trim() === '') {
+        throw new Error('Name is required');
+      }
+      const newUser = await this.userModel.create({
+        wallet: wallet.toLowerCase(),
+        name,
+        referrer  : referrer.toLowerCase(),
+        role: 'USER'
+    }); 
+    console.log('User registered successfully:', newUser);
+      return { success: true, user: newUser };
+    } catch (err) {
+      return { success: false, message: err.message };
+    }
+   
   }
 
   async fetchAll() {
@@ -139,7 +161,7 @@ export class UserService {
 
   async getReferralSummary(wallet: string) {
     const rootWallet = wallet.toLowerCase();
-
+    console.log("Calculating referral summary for:", rootWallet);
     /** 1️⃣ Direct referrals */
     const directUsers = await this.userModel
       .find({ referrer: rootWallet })

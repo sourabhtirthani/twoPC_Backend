@@ -53,7 +53,7 @@ export class IcoService {
   ];
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-  const { buyer, phaseId, txHash, tokens, amount } = data;
+  const { buyer, phaseId, txHash, tokens, amount,currency } = data;
 
   const buyerWallet = buyer.toLowerCase();
   const totalTokens = Number(tokens);
@@ -61,9 +61,9 @@ const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
   try {
     // 1️⃣ Prevent duplicate tx
     const exists = await this.transactionModel.findOne({ txHash });
-    // if (exists) {
-    //   return { success: false, message: "Transaction already recorded" };
-    // }
+    if (exists) {
+      return { success: false, message: "Transaction already recorded" };
+    }
 
     // 2️⃣ Fetch buyer
     let currentUser = await this.userModel.findOne({ wallet: buyerWallet });
@@ -118,6 +118,7 @@ const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
       amount: amount.toString(),
       tokens: buyerNetTokens.toString(),
       verified: true,
+      currency: currency || 'BNB',
     });
 
     // 6️⃣ Update buyer balance
@@ -146,6 +147,7 @@ const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
         tokens: r.amount.toString(),
         amount: "0",
         verified: true,
+        currency: currency || 'BNB',
       });
     }
 
