@@ -107,7 +107,7 @@ const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
     }
 
     // 4️⃣ Buyer net tokens
-    const buyerNetTokens = totalTokens - distributedTokens;
+    const buyerNetTokens = totalTokens;
 
     // 5️⃣ Store BUY transaction (buyer)
     await this.transactionModel.create({
