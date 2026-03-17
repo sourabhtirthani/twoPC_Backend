@@ -108,9 +108,9 @@ const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
     // 4️⃣ Buyer net tokens
     const buyerNetTokens = totalTokens;
-
+    console.log("Buyer net tokens:", buyerNetTokens, "Total rewards:", distributedTokens); 
     // 5️⃣ Store BUY transaction (buyer)
-    await this.transactionModel.create({
+    const buyerTransaction = await this.transactionModel.create({
       wallet: buyerWallet,
       txHash,
       from: buyerWallet,
@@ -120,12 +120,14 @@ const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
       verified: true,
       currency: currency || 'BNB',
     });
-
+    console.log("Buyer transaction recorded:", buyerTransaction);
     // 6️⃣ Update buyer balance
-    await this.userModel.findOneAndUpdate(
+    const updatedBuyer = await this.userModel.findOneAndUpdate(
       { wallet: buyerWallet },
-      { $inc: { balance: buyerNetTokens } }
+      { $inc: { balance: buyerNetTokens } },
+      { new: true }
     );
+    console.log("Updated buyer:", updatedBuyer);
 
     // 7️⃣ Store MLM rewards
     for (const r of rewards) {
